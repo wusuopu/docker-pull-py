@@ -152,8 +152,7 @@ def download_layer_blob(docker_image, auth, layer, layerdir):
     layer_filename = os.path.join(layerdir, 'layer_gzip.tar')
     blob_digest = layer['digest']
 
-    sys.stdout.write(blob_digest[7:19] + ': Downloading...')
-    sys.stdout.flush()
+    print(blob_digest[7:19] + ': Downloading...')
 
     auth_head = get_auth_head(
         docker_image, auth,
@@ -180,13 +179,19 @@ def download_layer_blob(docker_image, auth, layer, layerdir):
         print(bresp.content)
         raise Exception('download_layer_blob')
 
+    if (bresp.status_code == 206):
+        # 当前服务端支持断点续传
+        open_flag = 'ab+'
+        print('断点续传: %s' % (auth_head['Range']))
+    else:
+        open_flag = 'wb'
     bresp.raise_for_status()
     unit = int(bresp.headers['Content-Length']) / 50
     acc = 0
     nb_traits = 0
     progress_bar(blob_digest, nb_traits)
     # 保存 layer
-    with open(layer_filename, "ab+") as fp:
+    with open(layer_filename, open_flag) as fp:
         for chunk in bresp.iter_content(chunk_size=8192):
             if chunk:
                 fp.write(chunk)
